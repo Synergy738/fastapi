@@ -844,6 +844,10 @@ class APIRoute(routing.Route):
         self.path = path
         self.endpoint = endpoint
         self.stream_item_type: Any | None = None
+        can_set_stream_item = (
+            isinstance(response_class, DefaultPlaceholder)
+            or lenient_issubclass(response_class, EventSourceResponse)
+        )
         if isinstance(response_model, DefaultPlaceholder):
             return_annotation = get_typed_return_annotation(endpoint)
             if lenient_issubclass(return_annotation, Response):
@@ -857,14 +861,25 @@ class APIRoute(routing.Route):
                     # ServerSentEvent is excluded: it's a transport
                     # wrapper, not a data model, so it shouldn't feed
                     # into validation or OpenAPI schema generation.
-                    if (
-                        isinstance(response_class, DefaultPlaceholder)
-                        or lenient_issubclass(response_class, EventSourceResponse)
-                    ) and not lenient_issubclass(stream_item, ServerSentEvent):
+                    if can_set_stream_item and not lenient_issubclass(
+                        stream_item, ServerSentEvent
+                    ):
                         self.stream_item_type = stream_item
                     response_model = None
                 else:
                     response_model = return_annotation
+        if (
+            self.stream_item_type is None
+            and response_model is None
+            and can_set_stream_item
+        ):
+            return_annotation = get_typed_return_annotation(endpoint)
+            if not lenient_issubclass(return_annotation, Response):
+                stream_item = get_stream_item_type(return_annotation)
+                if stream_item is not None and not lenient_issubclass(
+                    stream_item, ServerSentEvent
+                ):
+                    self.stream_item_type = stream_item
         self.response_model = response_model
         self.summary = summary
         self.response_description = response_description

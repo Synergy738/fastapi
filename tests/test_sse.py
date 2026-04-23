@@ -265,6 +265,47 @@ def test_sse_on_router_included_in_app(client: TestClient):
     assert len(data_lines) == 2
 
 
+def test_sse_route_include_router_preserves_stream_item_type():
+    class Event(BaseModel):
+        message: str
+
+    router = APIRouter()
+
+    @router.get("/events", response_class=EventSourceResponse)
+    async def get_events() -> AsyncIterable[Event]:
+        yield Event(message="test")
+
+    include_router_app = FastAPI()
+    include_router_app.include_router(router)
+
+    route = include_router_app.routes[-1]
+    assert route.stream_item_type == Event
+
+
+def test_sse_route_include_router_openapi_schema():
+    class Event(BaseModel):
+        message: str
+
+    router = APIRouter()
+
+    @router.get("/events", response_class=EventSourceResponse)
+    async def get_events() -> AsyncIterable[Event]:
+        yield Event(message="test")
+
+    include_router_app = FastAPI()
+    include_router_app.include_router(router)
+
+    openapi = include_router_app.openapi()
+    sse_response = openapi["paths"]["/events"]["get"]["responses"]["200"]["content"][
+        "text/event-stream"
+    ]
+
+    assert "itemSchema" in sse_response
+    assert "properties" in sse_response["itemSchema"]
+    assert "data" in sse_response["itemSchema"]["properties"]
+    assert "contentSchema" in sse_response["itemSchema"]["properties"]["data"]
+
+
 # Keepalive ping tests
 
 
