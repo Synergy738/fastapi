@@ -844,10 +844,9 @@ class APIRoute(routing.Route):
         self.path = path
         self.endpoint = endpoint
         self.stream_item_type: Any | None = None
-        can_set_stream_item = (
-            isinstance(response_class, DefaultPlaceholder)
-            or lenient_issubclass(response_class, EventSourceResponse)
-        )
+        can_set_stream_item = isinstance(
+            response_class, DefaultPlaceholder
+        ) or lenient_issubclass(response_class, EventSourceResponse)
         if isinstance(response_model, DefaultPlaceholder):
             return_annotation = get_typed_return_annotation(endpoint)
             if lenient_issubclass(return_annotation, Response):
